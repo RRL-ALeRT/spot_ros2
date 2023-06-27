@@ -35,7 +35,7 @@ from geometry_msgs.msg import Pose, PoseStamped, TransformStamped, Twist, TwistW
 from google.protobuf.timestamp_pb2 import Timestamp
 from nav_msgs.msg import Odometry
 from rclpy import Parameter
-from rclpy.action import ActionServer
+from rclpy.action import ActionServer, CancelResponse
 from rclpy.action.server import ServerGoalHandle
 from rclpy.callback_groups import CallbackGroup, MutuallyExclusiveCallbackGroup, ReentrantCallbackGroup
 from rclpy.clock import Clock
@@ -564,7 +564,7 @@ class SpotROS(Node):
             # spot_ros.navigate_as.start() # As is online
 
             self.trajectory_server = ActionServer(
-                self, Trajectory, "trajectory", self.handle_trajectory, callback_group=self.group
+                self, Trajectory, "trajectory", self.handle_trajectory, callback_group=self.group, cancel_callback=self.handle_trajectory_cancel_callback
             )
             # spot_ros.trajectory_server.start()
 
@@ -1490,9 +1490,17 @@ class SpotROS(Node):
             self.get_logger().info("Returning action result " + str(result))
         return result
 
+    def handle_trajectory_cancel_callback(self, goal_handle):
+        self.trajectory_on = False
+        """Accept or reject a client request to cancel an action."""
+        self.get_logger().info('Received cancel request')
+        return CancelResponse.ACCEPT
+
     def handle_trajectory(self, goal_handle: ServerGoalHandle) -> Optional[Trajectory.Result]:
         """ROS actionserver execution handler to handle receiving a request to move to a location"""
         result: Optional[Trajectory.Result] = None
+
+        self.trajectory_on = True
 
         if goal_handle.request.target_pose.header.frame_id != "body":
             goal_handle.abort()
@@ -1527,10 +1535,11 @@ class SpotROS(Node):
                 z=goal_handle.request.target_pose.pose.orientation.z,
             ).to_yaw(),
             cmd_duration=cmd_duration_secs,
+            frame_name=self.preferred_odom_frame.value,
             precise_position=goal_handle.request.precise_positioning,
         )
 
-        command_start_time = self.get_clock().now()
+        command_end_time = self.get_clock().now().nanoseconds / 1e9 + cmd_duration_secs
 
         # Abort the action server if cmd_duration is exceeded - the driver stops but does not provide
         # feedback to indicate this, so we monitor it ourselves
@@ -1539,14 +1548,8 @@ class SpotROS(Node):
         # Also check the is_active to
         # monitor whether the timeout has already aborted the command
 
-        #
-        # Pre-emp missing in port to ROS2 (ros1: self.trajectory_server.is_preempt_requested())
-        #
-
-        # rate = rclpy.Rate(10)
-
         try:
-            while rclpy.ok() and not self.spot_wrapper.at_goal and goal_handle.is_active:
+            while rclpy.ok() and not self.spot_wrapper.at_goal and goal_handle.is_active and self.trajectory_on:
                 feedback = Trajectory.Feedback()
                 if self.spot_wrapper.near_goal:
                     if self.spot_wrapper._last_trajectory_command_precise:
@@ -1556,14 +1559,10 @@ class SpotROS(Node):
                 else:
                     feedback.feedback = "Moving to goal"
 
-                # rate.sleep()
                 goal_handle.publish_feedback(feedback)
-                time.sleep(0.1)
+                self.create_rate(10).sleep()
 
-                # check for timeout
-                com_dur = self.get_clock().now() - command_start_time
-
-                if com_dur.nanoseconds / 1e9 > (cmd_duration_secs * 10.3):
+                if self.get_clock().now().nanoseconds / 1e9 > command_end_time:
                     # timeout, quit with failure
                     self.get_logger().error("TIMEOUT")
                     feedback = Trajectory.Feedback()
@@ -1577,13 +1576,6 @@ class SpotROS(Node):
 
             # If still active after exiting the loop, the command did not time out
             if goal_handle.is_active:
-                #            if self.trajectory_server.is_preempt_requested():
-                #                self.trajectory_server.publish_feedback(TrajectoryFeedback("Preempted"))
-                #                self.trajectory_server.set_preempted()
-                #                self.spot_wrapper.stop()
-                #                result.success = False
-                #                result.message = 'preempt'
-
                 feedback = Trajectory.Feedback()
                 if self.spot_wrapper.at_goal:
                     # self.get_logger().error("SUCCESS")
