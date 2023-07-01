@@ -16,7 +16,7 @@ def generate_launch_description() -> launch.LaunchDescription:
 
     pkg_share = FindPackageShare("spot_description").find("spot_description")
     urdf_dir = os.path.join(pkg_share, "urdf")
-    xacro_file = os.path.join(urdf_dir, "spot.urdf.xacro")
+    xacro_file = os.path.join(urdf_dir, "spot_with_gen3.urdf.xacro")
     doc = xacro.process_file(xacro_file)
     robot_desc = doc.toprettyxml(indent="  ")
 
