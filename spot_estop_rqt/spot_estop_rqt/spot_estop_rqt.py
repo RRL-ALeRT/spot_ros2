@@ -30,8 +30,10 @@ class EstopRqtPlugin(Plugin):
         self.subscriber = self._context.node.create_subscription(String, 'estop_status', self.status_callback, QoSProfile(depth=10))
 
         # Create service clients
-        self.world_reset_client = self._context.node.create_client(Empty, '/reset_map_frame_and_travelled_path')
+        self.map_reset_client = self._context.node.create_client(Empty, '/reset_map_frame_and_travelled_path')
         self.world_info_reset_client = self._context.node.create_client(Empty, '/reset_world_info')
+        self.octomap_reset_client = self._context.node.create_client(Empty, '/octomap_server/reset')
+
 
         # Create the main widget and set up the layout
         self.widget = QWidget()
@@ -59,12 +61,8 @@ class EstopRqtPlugin(Plugin):
         hazmat_button.setStyleSheet("background-color: pink; font: bold 10px; border-width: 5px; border-radius:10px; padding: 10px")
         
         world_reset_button = QPushButton('World Reset')
-        world_reset_button.clicked.connect(self.world_reset)
+        world_reset_button.clicked.connect(self.world_reset_command)
         world_reset_button.setStyleSheet("background-color: pink; font: bold 10px; border-width: 5px; border-radius:10px; padding: 10px")
-
-        world_info_reset_button = QPushButton('World Info Reset')
-        world_info_reset_button.clicked.connect(self.world_info_reset)
-        world_info_reset_button.setStyleSheet("background-color: pink; font: bold 10px; border-width: 5px; border-radius:10px; padding: 10px")
 
         # Create the label for displaying status
         self.status_label = QLabel('Status: Unknown')
@@ -78,7 +76,7 @@ class EstopRqtPlugin(Plugin):
         third_row_buttons = QHBoxLayout()
         third_row_buttons.addWidget(hazmat_button)
         third_row_buttons.addWidget(world_reset_button)
-        third_row_buttons.addWidget(world_info_reset_button)
+        # third_row_buttons.addWidget(world_info_reset_button)
 
         layout.addWidget(stop_button)
         layout.addLayout(second_row_buttons)
@@ -121,17 +119,22 @@ class EstopRqtPlugin(Plugin):
         ssh_command = f'ssh -t max1@{MAX_IP} "screen -S spot_session -p Hazmat -X stuff \\"ros2 run world_info object_detection_yolov5 hazmat /kinova_color\\\\n\\""'
         subprocess.Popen(ssh_command, shell=True)
 
-    def world_reset(self):
-        if not self.world_reset_client.wait_for_service(timeout_sec=1.0):
-            self._context.node.get_logger().info('service world_reset not available, skipping command')
+    def world_reset_command(self):
+        if not self.map_reset_client.wait_for_service(timeout_sec=1.0):
+            self._context.node.get_logger().info('service map_reset not available, skipping command')
             return
-        self.world_reset_client.call_async(Empty.Request())
+        self.map_reset_client.call_async(Empty.Request())
 
-    def world_info_reset(self):
-        if not self.world_reset_client.wait_for_service(timeout_sec=1.0):
-            self._context.node.get_logger().info('service world_reset not available, skipping command')
+        if not self.world_info_reset_client.wait_for_service(timeout_sec=1.0):
+            self._context.node.get_logger().info('service world_info_reset not available, skipping command')
             return
         self.world_info_reset_client.call_async(Empty.Request())
+
+        if not self.octomap_reset_client.wait_for_service(timeout_sec=1.0):
+            self._context.node.get_logger().info('service octomap_reset not available, skipping command')
+            return
+        self.octomap_reset_client.call_async(Empty.Request())
+          
 
     def shutdown_plugin(self):
         self._context.node.destroy_node()
