@@ -408,6 +408,28 @@
         <origin xyz="-0.1 0 0.18" rpy="0 0 0" />    
     </joint>
 
+    <!-- Arm sensor CB - height = 15 width = 10 lenght = 20 -->
+    <link name="readiness_sensor_collision">
+    <visual>
+        <geometry>
+        <box size="0.20 0.06 0.15" />
+        </geometry>
+        <material name="red">
+        <color rgba="0 0 1 1" />
+        </material>
+    </visual>
+    <collision>
+        <geometry>
+        <box size="0.20 0.06 0.15" />
+        </geometry>
+    </collision>
+    </link>
+    <joint name="readiness_sensor_collision_joint" type="fixed">
+        <child link="readiness_sensor_collision" />
+        <parent link="gen3_end_effector_link" />
+        <origin xyz="0.0 -0.07 0.0" rpy="0 0 0" />    
+    </joint>
+
     <!-- Optional custom includes. -->
     <xacro:include filename="$(optenv SPOT_URDF_EXTRAS empty.urdf)" />
 </robot>
