@@ -7,6 +7,8 @@ import subprocess
 import rclpy
 from rclpy.qos import QoSProfile
 from std_msgs.msg import String
+from std_srvs.srv import Empty
+
 from rqt_gui_py.plugin import Plugin
 from python_qt_binding import loadUi
 from python_qt_binding.QtCore import Qt
@@ -26,6 +28,10 @@ class EstopRqtPlugin(Plugin):
 
         # Create the subscriber for status updates
         self.subscriber = self._context.node.create_subscription(String, 'estop_status', self.status_callback, QoSProfile(depth=10))
+
+        # Create service clients
+        self.world_reset_client = self._context.node.create_client(Empty, '/reset_map_frame_and_travelled_path')
+        self.world_info_reset_client = self._context.node.create_client(Empty, '/reset_world_info')
 
         # Create the main widget and set up the layout
         self.widget = QWidget()
@@ -48,17 +54,35 @@ class EstopRqtPlugin(Plugin):
         estop_button.clicked.connect(self.run_ssh_command)
         estop_button.setStyleSheet("background-color: blue; font: bold 20px; border-width: 5px; border-radius:20px; padding: 20px")
 
+        hazmat_button = QPushButton('Hazmat')
+        hazmat_button.clicked.connect(self.hazmat_command)
+        hazmat_button.setStyleSheet("background-color: pink; font: bold 10px; border-width: 5px; border-radius:10px; padding: 10px")
+        
+        world_reset_button = QPushButton('World Reset')
+        world_reset_button.clicked.connect(self.world_reset)
+        world_reset_button.setStyleSheet("background-color: pink; font: bold 10px; border-width: 5px; border-radius:10px; padding: 10px")
+
+        world_info_reset_button = QPushButton('World Info Reset')
+        world_info_reset_button.clicked.connect(self.world_info_reset)
+        world_info_reset_button.setStyleSheet("background-color: pink; font: bold 10px; border-width: 5px; border-radius:10px; padding: 10px")
+
         # Create the label for displaying status
         self.status_label = QLabel('Status: Unknown')
         self.status_label.setAlignment(Qt.AlignCenter)
         self.status_label.setStyleSheet("font: bold 16px")
 
-        button_layout = QHBoxLayout()
-        button_layout.addWidget(release_button)
-        button_layout.addWidget(estop_button)
+        second_row_buttons = QHBoxLayout()
+        second_row_buttons.addWidget(release_button)
+        second_row_buttons.addWidget(estop_button)
+
+        third_row_buttons = QHBoxLayout()
+        third_row_buttons.addWidget(hazmat_button)
+        third_row_buttons.addWidget(world_reset_button)
+        third_row_buttons.addWidget(world_info_reset_button)
 
         layout.addWidget(stop_button)
-        layout.addLayout(button_layout)
+        layout.addLayout(second_row_buttons)
+        layout.addLayout(third_row_buttons)
         layout.addWidget(self.status_label)
 
         # Add the widget to the plugin
@@ -88,6 +112,26 @@ class EstopRqtPlugin(Plugin):
         subprocess.Popen(ssh_command, shell=True)
         ssh_command = f'ssh -t max1@{MAX_IP} "screen -S spot_session -p Spot -X stuff \\"ros2 launch spot_driver_plus spot_launch.py\\\\n\\""'
         subprocess.Popen(ssh_command, shell=True)
+
+    def hazmat_command(self):
+        MAX_IP = os.getenv('MAX_IP')
+        if MAX_IP is None:
+            print("MAX_IP environment variable is not set.")
+            return
+        ssh_command = f'ssh -t max1@{MAX_IP} "screen -S spot_session -p Hazmat -X stuff \\"ros2 run world_info object_detection_yolov5 hazmat /kinova_color\\\\n\\""'
+        subprocess.Popen(ssh_command, shell=True)
+
+    def world_reset(self):
+        if not self.world_reset_client.wait_for_service(timeout_sec=1.0):
+            self._context.node.get_logger().info('service world_reset not available, skipping command')
+            return
+        self.world_reset_client.call_async(Empty.Request())
+
+    def world_info_reset(self):
+        if not self.world_reset_client.wait_for_service(timeout_sec=1.0):
+            self._context.node.get_logger().info('service world_reset not available, skipping command')
+            return
+        self.world_info_reset_client.call_async(Empty.Request())
 
     def shutdown_plugin(self):
         self._context.node.destroy_node()
