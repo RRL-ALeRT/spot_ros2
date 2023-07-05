@@ -41,6 +41,13 @@ def generate_launch_description():
                     )
     spot_plus.add_action(battery_screen)
 
+    map_vision = launch_ros.actions.Node(
+                        package='spot_driver_plus',
+                        executable='map_vision',
+                        output='screen',
+                    )
+    spot_plus.add_action(map_vision)
+
     back_image = ExecuteProcess(
                         cmd=['ros2', 'run', 'spot_cpp_ros2', 'get_image', 'back'],
                         output='screen'

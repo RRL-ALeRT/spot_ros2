@@ -23,6 +23,7 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(interactive_markers REQUIRED)
+find_package(hector_nav_msgs REQUIRED)
 
 add_executable(battery_screen cpp/battery_screen.cpp)
 ament_target_dependencies(battery_screen rclcpp spot_msgs)
@@ -37,11 +38,15 @@ ament_target_dependencies(spot_marker rclcpp tf2 tf2_ros geometry_msgs visualiza
 add_executable(spot_kinova_controller cpp/spot_kinova_controller.cpp)
 ament_target_dependencies(spot_kinova_controller rclcpp sensor_msgs geometry_msgs std_srvs spot_msgs tf2)
 
+add_executable(map_vision cpp/map_vision.cpp)
+ament_target_dependencies(map_vision rclcpp geometry_msgs tf2 tf2_ros std_srvs hector_nav_msgs visualization_msgs)
+
 install(TARGETS
   battery_screen
   depth_to_pcl
   spot_marker
   spot_kinova_controller
+  map_vision
   DESTINATION lib/${PROJECT_NAME}
 )
 
