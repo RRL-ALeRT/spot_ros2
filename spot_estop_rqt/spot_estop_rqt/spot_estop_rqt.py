@@ -12,7 +12,7 @@ from std_srvs.srv import Empty
 from rqt_gui_py.plugin import Plugin
 from python_qt_binding import loadUi
 from python_qt_binding.QtCore import Qt
-from python_qt_binding.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
+from python_qt_binding.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QScrollBar
 
 from rqt_gui.main import Main
 
@@ -25,6 +25,8 @@ class EstopRqtPlugin(Plugin):
 
         # Create the publisher for estop commands
         self.publisher = self._context.node.create_publisher(String, 'estop_command', QoSProfile(depth=10))
+
+        self.lights_pub = self._context.node.create_publisher(String, 'lights_camera', QoSProfile(depth=1))
 
         # Create the subscriber for status updates
         self.subscriber = self._context.node.create_subscription(String, 'estop_status', self.status_callback, QoSProfile(depth=10))
@@ -83,9 +85,62 @@ class EstopRqtPlugin(Plugin):
         layout.addLayout(third_row_buttons)
         layout.addWidget(self.status_label)
 
+        # Create the scroll bars
+        front_light = QScrollBar(Qt.Horizontal)
+        left_light = QScrollBar(Qt.Horizontal)
+        right_light = QScrollBar(Qt.Horizontal)
+
+        # Connect callbacks to scroll bars
+        front_light.valueChanged.connect(self.front_light_value_change_callback)
+        left_light.valueChanged.connect(self.left_light_value_change_callback)
+        right_light.valueChanged.connect(self.right_light_value_change_callback)
+
+        front_light.sliderReleased.connect(self.front_light_callback)
+        left_light.sliderReleased.connect(self.left_light_callback)
+        right_light.sliderReleased.connect(self.right_light_callback)
+
+        # Add the scroll areas to the layout
+        layout.addWidget(front_light)
+        layout.addWidget(left_light)
+        layout.addWidget(right_light)
+
         # Add the widget to the plugin
         self._widget = self.widget
         context.add_widget(self._widget)
+
+        self.front_value = 0
+        self.left_value = 0
+        self.right_value = 0
+
+    def front_light_value_change_callback(self, value):
+        self.front_value = int((value + 1) * 255 / 100)
+        if self.front_value < 4:
+            self.front_value = 0
+
+    def left_light_value_change_callback(self, value):
+        self.left_value = int((value + 1) * 255 / 100)
+        if self.left_value < 4:
+            self.left_value = 0
+
+    def right_light_value_change_callback(self, value):
+        self.right_value = int((value + 1) * 255 / 100)
+        if self.right_value < 4:
+            self.right_value = 0
+
+    def front_light_callback(self):
+        msg = String()
+        msg.data = f"camera_light:{self.front_value}"
+        self.lights_pub.publish(msg)
+
+    def left_light_callback(self):
+        msg = String()
+        msg.data = f"left_light:{self.left_value}"
+        self.lights_pub.publish(msg)
+
+    def right_light_callback(self):
+        msg = String()
+        msg.data = f"right_light:{self.right_value}"
+        self.lights_pub.publish(msg)
 
     def send_stop_command(self):
         command_msg = String()
