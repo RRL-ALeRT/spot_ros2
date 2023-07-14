@@ -3,11 +3,13 @@
 import sys
 import os
 import subprocess
+from functools import partial
 
 import rclpy
 from rclpy.qos import QoSProfile
 from std_msgs.msg import String
 from std_srvs.srv import Empty
+from composition_interfaces.srv import LoadNode, UnloadNode, ListNodes
 
 from rqt_gui_py.plugin import Plugin
 from python_qt_binding import loadUi
@@ -36,6 +38,16 @@ class EstopRqtPlugin(Plugin):
         self.world_info_reset_client = self._context.node.create_client(Empty, '/reset_world_info')
         self.octomap_reset_client = self._context.node.create_client(Empty, '/octomap_server/reset')
 
+        # Run "ros2 run rclcpp_components component_container --ros-args -r __node:=OperatorAudio" in operator's terminal
+        self.load_audio_operator_node = self._context.node.create_client(LoadNode, '/OperatorAudio/_container/load_node')
+        self.unload_audio_operator_node = self._context.node.create_client(UnloadNode, '/OperatorAudio/_container/unload_node')
+        self.list_audio_operator_nodes = self._context.node.create_client(ListNodes, '/OperatorAudio/_container/list_nodes')
+
+        # Run "ros2 run rclcpp_components component_container --ros-args -r __node:=NucAudio" in nuc's terminal
+        # Run "pulseaudio --daemonize" if NUC is connected in ssh
+        self.load_audio_nuc_node = self._context.node.create_client(LoadNode, '/NucAudio/_container/load_node')
+        self.unload_audio_nuc_node = self._context.node.create_client(UnloadNode, '/NucAudio/_container/unload_node')
+        self.list_audio_nuc_nodes = self._context.node.create_client(ListNodes, '/NucAudio/_container/list_nodes')
 
         # Create the main widget and set up the layout
         self.widget = QWidget()
@@ -71,6 +83,14 @@ class EstopRqtPlugin(Plugin):
         self.status_label.setAlignment(Qt.AlignCenter)
         self.status_label.setStyleSheet("font: bold 16px")
 
+        # Create the toggle button
+        two_way_audio = QPushButton('2WayAudio')
+        two_way_audio.setCheckable(True)
+        two_way_audio.setStyleSheet("QPushButton { font: bold 10px; border-width: 5px; border-radius:10px; padding: 10px }"
+                                          "QPushButton:checked { background-color: green }"
+                                          "QPushButton:unchecked { background-color: red }")
+        two_way_audio.clicked.connect(partial(self.toggle_component, two_way_audio))
+
         second_row_buttons = QHBoxLayout()
         second_row_buttons.addWidget(release_button)
         second_row_buttons.addWidget(estop_button)
@@ -78,7 +98,7 @@ class EstopRqtPlugin(Plugin):
         third_row_buttons = QHBoxLayout()
         third_row_buttons.addWidget(hazmat_button)
         third_row_buttons.addWidget(world_reset_button)
-        # third_row_buttons.addWidget(world_info_reset_button)
+        third_row_buttons.addWidget(two_way_audio)
 
         layout.addWidget(stop_button)
         layout.addLayout(second_row_buttons)
@@ -111,6 +131,73 @@ class EstopRqtPlugin(Plugin):
         self.front_value = 0
         self.left_value = 0
         self.right_value = 0
+
+    def toggle_component(self, button):
+        if button.isChecked():
+            if not self.load_audio_operator_node.wait_for_service(timeout_sec=1.0):
+                self._context.node.get_logger().info('service load_audio_operator_node not available, skipping command')
+                return
+            
+            if not self.load_audio_nuc_node.wait_for_service(timeout_sec=1.0):
+                self._context.node.get_logger().info('service load_audio_nuc_node not available, skipping command')
+                return
+            
+            # One capture and other plays with topics from each other's capture nodes
+            req = LoadNode.Request()
+            req.package_name = "audio_capture"
+            req.plugin_name = "audio_capture::AudioCaptureNode"
+            req.node_namespace = "/operator_to_nuc"
+            self.load_audio_operator_node.call_async(req)
+
+            req.node_namespace = "/nuc_to_operator"
+            self.load_audio_nuc_node.call_async(req)
+
+            req = LoadNode.Request()
+            req.package_name = "audio_play"
+            req.plugin_name = "audio_play::AudioPlayNode"
+            req.node_namespace = "/nuc_to_operator"
+            self.load_audio_operator_node.call_async(req)
+
+            req.node_namespace = "/operator_to_nuc"
+            self.load_audio_nuc_node.call_async(req)
+        else:
+            # OPERATOR
+            if not self.list_audio_operator_nodes.wait_for_service(timeout_sec=1.0):
+                self._context.node.get_logger().info('service list_audio_operator_nodes not available, skipping command')
+                return
+            
+            list_of_nodes = self.list_audio_operator_nodes.call_async(ListNodes.Request())
+
+            while not list_of_nodes.done() and rclpy.ok():
+                pass
+
+            if not self.unload_audio_operator_node.wait_for_service(timeout_sec=1.0):
+                self._context.node.get_logger().info('service unload_audio_operator_node not available, skipping command')
+                return
+            
+            for id in list(list_of_nodes.result().unique_ids):
+                req = UnloadNode.Request()
+                req.unique_id = id
+                self.unload_audio_operator_node.call_async(req)
+            
+            # NUC
+            if not self.list_audio_nuc_nodes.wait_for_service(timeout_sec=1.0):
+                self._context.node.get_logger().info('service list_audio_nuc_nodes not available, skipping command')
+                return
+            
+            list_of_nodes = self.list_audio_nuc_nodes.call_async(ListNodes.Request())
+
+            while not list_of_nodes.done() and rclpy.ok():
+                pass
+
+            if not self.unload_audio_nuc_node.wait_for_service(timeout_sec=1.0):
+                self._context.node.get_logger().info('service unload_audio_nuc_node not available, skipping command')
+                return
+            
+            for id in list(list_of_nodes.result().unique_ids):
+                req = UnloadNode.Request()
+                req.unique_id = id
+                self.unload_audio_nuc_node.call_async(req)
 
     def front_light_value_change_callback(self, value):
         self.front_value = int((value + 1) * 255 / 100)
