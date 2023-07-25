@@ -154,6 +154,7 @@ class SpotROS(Node):
         self.run_navigate_to: Optional[bool] = None
         self._printed_once: bool = False
 
+        self.previous_map_frame = None
         self.get_logger().info(COLOR_GREEN + "Hi from spot_driver." + COLOR_END)
 
         self.callbacks: Dict[str, Callable] = {}
@@ -558,6 +559,13 @@ class SpotROS(Node):
                 callback_group=self.group,
             )
 
+            self.create_service(
+                Trigger,
+                "reset_map_frame",
+                self.reset_map_frame,
+                callback_group=self.group,
+            )
+
             self.navigate_as = ActionServer(
                 self, NavigateTo, "navigate_to", self.handle_navigate_to, callback_group=self.group
             )
@@ -655,7 +663,8 @@ class SpotROS(Node):
                 self.joint_state_pub.publish(joint_state)
 
             # TF
-            tf_msg = get_tf_from_state(state, self.spot_wrapper, self.preferred_odom_frame.value)
+            tf_msg, self.previous_map_frame = get_tf_from_state(state, self.spot_wrapper, self.preferred_odom_frame.value, self.previous_map_frame)
+
             if len(tf_msg.transforms) > 0:
                 self.dynamic_broadcaster.sendTransform(tf_msg.transforms)
 
@@ -1691,6 +1700,14 @@ class SpotROS(Node):
             response.message = f"Exception Error:{e}"
         if response.success:
             self.get_logger().info(f"Successfully set GraphNav localization. Method: {request.method}")
+        return response
+
+    def reset_map_frame(
+        self, request: Trigger.Request, response: Trigger.Response
+    ) -> Trigger.Response:
+        self.previous_map_frame = None
+        response.success = True
+        response.message = "Resetted map frame"
         return response
 
     def handle_graph_nav_upload_graph(

@@ -11,6 +11,7 @@
 #include <tf2/exceptions.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/static_transform_broadcaster.h>
 #include <std_srvs/srv/empty.hpp>
 #include <hector_nav_msgs/srv/get_robot_trajectory.hpp>
@@ -30,7 +31,8 @@ public:
   {
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
-    tf_static_broadcaster_ = std::make_unique<tf2_ros::StaticTransformBroadcaster>(this);
+    // tf_static_broadcaster_ = std::make_unique<tf2_ros::StaticTransformBroadcaster>(this);
+    tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(this);
 
     travelled_path_pub = create_publisher<visualization_msgs::msg::Marker>("travelled_path", 1);
 
@@ -38,8 +40,11 @@ public:
 
     robot_trajectory_server = create_service<GetRT>("get_robot_trajectory", std::bind(&FrameListener::handle_robot_trajectory_service, this, _1, _2, _3));
 
+    // // Call on_timer function every second
+    // map_frame_timer_ = create_wall_timer(0.02s, std::bind(&FrameListener::on_map_frame_timer, this));
+
     // Call on_timer function every second
-    timer_ = create_wall_timer(0.1s, std::bind(&FrameListener::on_timer, this));
+    path_timer_ = create_wall_timer(1s, std::bind(&FrameListener::on_path_timer, this));
 
     if (!has_parameter("base_frame")) declare_parameter("base_frame", base_frame);
     get_parameter("base_frame", base_frame);
@@ -84,7 +89,7 @@ private:
     return false;
   }
 
-  void on_timer()
+  void on_map_frame_timer()
   {
     if (!map_frame_published) {
       try {
@@ -122,8 +127,11 @@ private:
         return;
       }
     }
-    tf_static_broadcaster_->sendTransform(t);
+    tf_broadcaster_->sendTransform(t);
+  }
 
+  void on_path_timer()
+  {
     try {
       std::string toFrameRel = "map";
       std::string fromFrameRel = base_frame;
@@ -182,10 +190,12 @@ private:
   std::string odom_frame = "vision";
   bool map_frame_published = false;
 
-  rclcpp::TimerBase::SharedPtr timer_{nullptr};
+  rclcpp::TimerBase::SharedPtr map_frame_timer_{nullptr};
+  rclcpp::TimerBase::SharedPtr path_timer_{nullptr};
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
-  std::unique_ptr<tf2_ros::StaticTransformBroadcaster> tf_static_broadcaster_;
+  // std::unique_ptr<tf2_ros::StaticTransformBroadcaster> tf_static_broadcaster_;
+  std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr travelled_path_pub;
   rclcpp::Service<Empty>::SharedPtr reset_server;

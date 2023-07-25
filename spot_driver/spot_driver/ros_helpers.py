@@ -5,6 +5,7 @@ from typing import Callable, List, Optional, Tuple, Union
 import builtin_interfaces.msg
 import cv2
 import numpy as np
+import math
 import rclpy
 import rclpy.time
 import tf2_py as tf2
@@ -46,6 +47,7 @@ try:
 except ModuleNotFoundError:
     from .manual_conversions import ros_transform_to_se3_pose
 
+import copy
 
 friendly_joint_names = {}
 """Dictionary for mapping BD joint names to more friendly names"""
@@ -427,7 +429,7 @@ def get_wifi_from_state(state: robot_state_pb2.RobotState, spot_wrapper: SpotWra
 
 
 def get_tf_from_state(
-    state: robot_state_pb2.RobotState, spot_wrapper: SpotWrapper, inverse_target_frame: str
+    state: robot_state_pb2.RobotState, spot_wrapper: SpotWrapper, inverse_target_frame: str, previous_map_frame
 ) -> TFMessage:
     """Maps robot link state data from robot state proto to ROS TFMessage message
     Args:
@@ -450,6 +452,79 @@ def get_tf_from_state(
                     new_tf = populate_transform_stamped(
                         tf_time, frame_name, transform.parent_frame_name, geo_tform_inversed, spot_wrapper.frame_prefix
                     )
+
+                    def quaternion_from_euler(ai, aj, ak):
+                        ai /= 2.0
+                        aj /= 2.0
+                        ak /= 2.0
+                        ci = math.cos(ai)
+                        si = math.sin(ai)
+                        cj = math.cos(aj)
+                        sj = math.sin(aj)
+                        ck = math.cos(ak)
+                        sk = math.sin(ak)
+                        cc = ci*ck
+                        cs = ci*sk
+                        sc = si*ck
+                        ss = si*sk
+
+                        q = np.empty((4, ))
+                        q[0] = cj*sc - sj*cs
+                        q[1] = cj*ss + sj*cc
+                        q[2] = cj*cs - sj*sc
+                        q[3] = cj*cc + sj*ss
+
+                        return q
+
+                    def quaternion_to_euler(q):
+                        """
+                        Convert a quaternion to Euler angles.
+
+                        :param q: A quaternion in the form [x, y, z, w]
+                        :type q: list
+                        :return: Euler angles in the form (roll, pitch, yaw)
+                        :rtype: tuple
+                        """
+                        x, y, z, w = q
+
+                        # Roll (x-axis rotation)
+                        roll = math.atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y))
+
+                        # Pitch (y-axis rotation)
+                        pitch = math.asin(2 * (w * y - z * x))
+
+                        # Yaw (z-axis rotation)
+                        yaw = math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
+
+                        return roll, pitch, yaw
+
+                    if previous_map_frame == None:
+                        geo_tform_inversed = SE3Pose.from_obj(transform.parent_tform_child)
+                        map_tf = populate_transform_stamped(
+                            tf_time, frame_name, transform.parent_frame_name, geo_tform_inversed, spot_wrapper.frame_prefix
+                        )
+
+                        map_tf.header.frame_id = "map"
+                        map_tf.child_frame_id = "vision"
+                        map_tf.transform.translation.z = new_tf.transform.translation.z + 0.094
+
+                        q = map_tf.transform.rotation
+
+                        roll, pitch, yaw = quaternion_to_euler((q.x, q.y, q.z, q.w))
+
+                        q_only_way = quaternion_from_euler(0, 0, yaw)
+
+                        map_tf.transform.rotation.x = q_only_way[0]
+                        map_tf.transform.rotation.y = q_only_way[1]
+                        map_tf.transform.rotation.z = q_only_way[2]
+                        map_tf.transform.rotation.w = q_only_way[3]
+
+                        previous_map_frame = map_tf
+
+                    previous_map_frame.header.stamp = new_tf.header.stamp
+                    
+                    tf_msg.transforms.append(previous_map_frame)
+
                 else:
                     new_tf = populate_transform_stamped(
                         tf_time,
@@ -462,7 +537,7 @@ def get_tf_from_state(
             except Exception as e:
                 spot_wrapper.logger.error("Error: {}".format(e))
 
-    return tf_msg
+    return tf_msg, previous_map_frame
 
 
 def get_frame_names_associated_with_object(world_object: world_object_pb2.WorldObject) -> List[str]:
