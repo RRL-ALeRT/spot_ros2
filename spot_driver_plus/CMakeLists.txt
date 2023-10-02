@@ -41,12 +41,16 @@ ament_target_dependencies(spot_kinova_controller rclcpp sensor_msgs geometry_msg
 add_executable(map_vision cpp/map_vision.cpp)
 ament_target_dependencies(map_vision rclcpp geometry_msgs tf2 tf2_ros std_srvs hector_nav_msgs visualization_msgs)
 
+add_executable(gen3_joint_states_republisher cpp/gen3_joint_states_republisher.cpp)
+ament_target_dependencies(gen3_joint_states_republisher rclcpp geometry_msgs tf2 tf2_ros std_srvs hector_nav_msgs visualization_msgs)
+
 install(TARGETS
   battery_screen
   depth_to_pcl
   spot_marker
   spot_kinova_controller
   map_vision
+  gen3_joint_states_republisher
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -61,6 +65,7 @@ install(DIRECTORY config
 # Python nodes (at least one cpp node should be available to see these)
 set(PYTHON_NODES
   get_pcl.py
+  gen3_servo_controller.py
 )
 install(DIRECTORY python/${PROJECT_NAME}
   DESTINATION lib

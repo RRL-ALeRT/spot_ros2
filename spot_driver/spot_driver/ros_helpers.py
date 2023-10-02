@@ -512,12 +512,12 @@ def get_tf_from_state(
 
                         roll, pitch, yaw = quaternion_to_euler((q.x, q.y, q.z, q.w))
 
-                        q_only_way = quaternion_from_euler(0, 0, yaw)
+                        q_only_yaw = quaternion_from_euler(0, 0, yaw)
 
-                        map_tf.transform.rotation.x = q_only_way[0]
-                        map_tf.transform.rotation.y = q_only_way[1]
-                        map_tf.transform.rotation.z = q_only_way[2]
-                        map_tf.transform.rotation.w = q_only_way[3]
+                        map_tf.transform.rotation.x = q_only_yaw[0]
+                        map_tf.transform.rotation.y = q_only_yaw[1]
+                        map_tf.transform.rotation.z = q_only_yaw[2]
+                        map_tf.transform.rotation.w = q_only_yaw[3]
 
                         previous_map_frame = map_tf
 

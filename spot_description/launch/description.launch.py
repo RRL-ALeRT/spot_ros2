@@ -7,7 +7,7 @@ from launch.substitutions import Command, LaunchConfiguration
 
 def generate_launch_description() -> launch.LaunchDescription:
     pkg_share = launch_ros.substitutions.FindPackageShare(package="spot_description").find("spot_description")
-    default_model_path = os.path.join(pkg_share, "urdf/spot.urdf.xacro")
+    default_model_path = os.path.join(pkg_share, "urdf/spot_with_gen3.urdf.xacro")
     default_rviz2_path = os.path.join(pkg_share, "rviz/viz_spot.rviz")
     # default_rviz_config_path = os.path.join(pkg_share, 'rviz/urdf_config.rviz')
 

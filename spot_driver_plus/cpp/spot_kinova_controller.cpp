@@ -12,7 +12,8 @@ const std::string JOY_TOPIC = "/joy";
 const std::string SPOT_TWIST_TOPIC = "/cmd_vel";
 const std::string SPOT_JOY_TOPIC = "/joy_spot";
 const std::string SPOT_POSE_TOPIC = "/body_pose";
-const std::string KINOVA_TWIST_TOPIC = "/servo_node/delta_twist_cmds";
+// const std::string KINOVA_TWIST_TOPIC = "/servo_node/delta_twist_cmds";
+const std::string KINOVA_TWIST_TOPIC = "/kinova_twist";
 const std::string KINOVA_JOY_TOPIC = "/joy_kinova";
 
 // Enums for button names -> axis/button array index

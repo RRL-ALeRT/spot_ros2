@@ -31,7 +31,7 @@ from bosdyn.api.spot import robot_command_pb2 as spot_command_pb2
 from bosdyn.client import math_helpers
 from bosdyn.client.exceptions import InternalServerError
 from bosdyn_msgs.msg import ManipulationApiFeedbackResponse, RobotCommandFeedback
-from geometry_msgs.msg import Pose, PoseStamped, TransformStamped, Twist, TwistWithCovarianceStamped
+from geometry_msgs.msg import Pose, PoseStamped, TransformStamped, Twist, TwistWithCovarianceStamped, Point, PointStamped
 from google.protobuf.timestamp_pb2 import Timestamp
 from nav_msgs.msg import Odometry
 from rclpy import Parameter
@@ -46,6 +46,8 @@ from rclpy.publisher import Publisher
 from rclpy.timer import Rate
 from sensor_msgs.msg import CameraInfo, Image, JointState
 from std_srvs.srv import SetBool, Trigger
+from visualization_msgs.msg import Marker
+from tf2_geometry_msgs import do_transform_point
 
 import spot_driver.conversions as conv
 from spot_msgs.action import Manipulation, NavigateTo, RobotCommand, Trajectory  # type: ignore
@@ -155,6 +157,7 @@ class SpotROS(Node):
         self._printed_once: bool = False
 
         self.previous_map_frame = None
+        self.spot_path = []
         self.get_logger().info(COLOR_GREEN + "Hi from spot_driver." + COLOR_END)
 
         self.callbacks: Dict[str, Callable] = {}
@@ -403,6 +406,8 @@ class SpotROS(Node):
             self.system_faults_pub: Publisher = self.create_publisher(SystemFaultState, "status/system_faults", 1)
             self.feedback_pub: Publisher = self.create_publisher(Feedback, "status/feedback", 1)
             self.mobility_params_pub: Publisher = self.create_publisher(MobilityParams, "status/mobility_params", 1)
+
+            self.path_pub: Publisher = self.create_publisher(Marker, "travelled_path", 1)
 
             self.create_subscription(Twist, "cmd_vel", self.cmd_velocity_callback, 1, callback_group=self.group)
             self.create_subscription(Pose, "body_pose", self.body_pose_callback, 1, callback_group=self.group)
@@ -667,6 +672,41 @@ class SpotROS(Node):
 
             if len(tf_msg.transforms) > 0:
                 self.dynamic_broadcaster.sendTransform(tf_msg.transforms)
+
+                for t in tf_msg.transforms:
+                    if self.previous_map_frame == None:
+                        break
+                    if t.header.frame_id == "vision":
+                        vision_point_stamped = PointStamped()
+                        vision_point_stamped.point.x = t.transform.translation.x
+                        vision_point_stamped.point.y = t.transform.translation.y
+                        vision_point_stamped.point.z = t.transform.translation.z
+
+                        # Transform the point from 'odom' to 'map' frame
+                        map_point = do_transform_point(vision_point_stamped, self.previous_map_frame).point
+
+                        if len(self.spot_path) > 0:
+                            if abs(map_point.x - self.spot_path[-1].x) > 0.05 or \
+                               abs(map_point.y - self.spot_path[-1].y) > 0.05 or \
+                               abs(map_point.z - self.spot_path[-1].z) > 0.05:
+                                
+                                self.spot_path.append(map_point)
+
+                                path_marker = Marker()
+                                path_marker.header.frame_id = "map"
+                                path_marker.type = path_marker.LINE_STRIP
+                                path_marker.action = path_marker.ADD
+                                path_marker.scale.x = 0.05
+                                path_marker.color.a = 0.8
+                                path_marker.color.r = 0.2
+                                path_marker.color.g = 0.8
+                                path_marker.color.b = 0.8
+
+                                path_marker.points = self.spot_path[-100:]
+                                self.path_pub.publish(path_marker)
+                        else:
+                            self.spot_path.append(map_point)
+                        break
 
             # Odom Twist #
             twist_odom_msg = get_odom_twist_from_state(state, self.spot_wrapper)
