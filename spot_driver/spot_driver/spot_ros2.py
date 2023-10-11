@@ -685,27 +685,28 @@ class SpotROS(Node):
                         # Transform the point from 'odom' to 'map' frame
                         map_point = do_transform_point(vision_point_stamped, self.previous_map_frame).point
 
-                        if len(self.spot_path) > 0:
+                        if len(self.spot_path) == 0:
+                            self.spot_path.append(map_point)
+                        else:
                             if abs(map_point.x - self.spot_path[-1].x) > 0.05 or \
                                abs(map_point.y - self.spot_path[-1].y) > 0.05 or \
                                abs(map_point.z - self.spot_path[-1].z) > 0.05:
-                                
-                                self.spot_path.append(map_point)
 
-                                path_marker = Marker()
-                                path_marker.header.frame_id = "map"
-                                path_marker.type = path_marker.LINE_STRIP
-                                path_marker.action = path_marker.ADD
-                                path_marker.scale.x = 0.05
-                                path_marker.color.a = 0.8
-                                path_marker.color.r = 0.2
-                                path_marker.color.g = 0.8
-                                path_marker.color.b = 0.8
+                               self.spot_path.append(map_point)
 
-                                path_marker.points = self.spot_path[-100:]
-                                self.path_pub.publish(path_marker)
-                        else:
-                            self.spot_path.append(map_point)
+                        path_marker = Marker()
+                        path_marker.header.frame_id = "map"
+                        path_marker.type = path_marker.LINE_STRIP
+                        path_marker.action = path_marker.ADD
+                        path_marker.scale.x = 0.05
+                        path_marker.color.a = 0.8
+                        path_marker.color.r = 0.2
+                        path_marker.color.g = 0.8
+                        path_marker.color.b = 0.8
+
+                        path_marker.points = self.spot_path[-100:]
+                        self.path_pub.publish(path_marker)
+
                         break
 
             # Odom Twist #
