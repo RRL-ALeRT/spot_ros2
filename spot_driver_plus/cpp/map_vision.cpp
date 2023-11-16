@@ -34,9 +34,9 @@ public:
     // tf_static_broadcaster_ = std::make_unique<tf2_ros::StaticTransformBroadcaster>(this);
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(this);
 
-    travelled_path_pub = create_publisher<visualization_msgs::msg::Marker>("/travelled_path", 1);
+    travelled_path_pub = create_publisher<visualization_msgs::msg::Marker>("travelled_path", 1);
 
-    reset_server = create_service<Empty>("/reset_travelled_path", std::bind(&FrameListener::map_frame_and_path_reset_handle_service, this, _1, _2, _3));
+    reset_server = create_service<Empty>("reset_map_frame_and_travelled_path", std::bind(&FrameListener::map_frame_and_path_reset_handle_service, this, _1, _2, _3));
 
     robot_trajectory_server = create_service<GetRT>("get_robot_trajectory", std::bind(&FrameListener::handle_robot_trajectory_service, this, _1, _2, _3));
 
@@ -44,7 +44,7 @@ public:
     // map_frame_timer_ = create_wall_timer(0.02s, std::bind(&FrameListener::on_map_frame_timer, this));
 
     // Call on_timer function every second
-    path_timer_ = create_wall_timer(0.5s, std::bind(&FrameListener::on_path_timer, this));
+    path_timer_ = create_wall_timer(1s, std::bind(&FrameListener::on_path_timer, this));
 
     if (!has_parameter("base_frame")) declare_parameter("base_frame", base_frame);
     get_parameter("base_frame", base_frame);
@@ -89,46 +89,46 @@ private:
     return false;
   }
 
-  // void on_map_frame_timer()
-  // {
-  //   if (!map_frame_published) {
-  //     try {
-  //       std::string toFrameRel = base_frame;
-  //       std::string fromFrameRel = odom_frame;
-  //       t = tf_buffer_->lookupTransform(
-  //         toFrameRel, fromFrameRel,
-  //         tf2::TimePointZero);
-  //       t.header.frame_id = "map";
-  //       t.child_frame_id = odom_frame;
-  //       if (ground_height == NULL)
-  //       {
-  //         ground_height = t.transform.translation.z - 0.094;
-  //       }
-  //       t.transform.translation.z = -ground_height;
+  void on_map_frame_timer()
+  {
+    if (!map_frame_published) {
+      try {
+        std::string toFrameRel = base_frame;
+        std::string fromFrameRel = odom_frame;
+        t = tf_buffer_->lookupTransform(
+          toFrameRel, fromFrameRel,
+          tf2::TimePointZero);
+        t.header.frame_id = "map";
+        t.child_frame_id = odom_frame;
+        if (ground_height == NULL)
+        {
+          ground_height = t.transform.translation.z - 0.094;
+        }
+        t.transform.translation.z = -ground_height;
 
-  //       auto q = tf2::Quaternion{t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w};
-  //       tf2::Matrix3x3 m;
-  //       m.setRotation(q);
+        auto q = tf2::Quaternion{t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w};
+        tf2::Matrix3x3 m;
+        m.setRotation(q);
 
-  //       tf2Scalar roll, pitch, yaw;
-  //       m.getRPY(roll, pitch, yaw);
+        tf2Scalar roll, pitch, yaw;
+        m.getRPY(roll, pitch, yaw);
 
-  //       tf2::Quaternion q_only_way;
-  //       q_only_way.setRPY(0, 0, yaw);
+        tf2::Quaternion q_only_way;
+        q_only_way.setRPY(0, 0, yaw);
 
-  //       t.transform.rotation.x = q_only_way.getX();
-  //       t.transform.rotation.y = q_only_way.getY();
-  //       t.transform.rotation.z = q_only_way.getZ();
-  //       t.transform.rotation.w = q_only_way.getW();
+        t.transform.rotation.x = q_only_way.getX();
+        t.transform.rotation.y = q_only_way.getY();
+        t.transform.rotation.z = q_only_way.getZ();
+        t.transform.rotation.w = q_only_way.getW();
 
-  //       map_frame_published = true;
-  //     } catch (const tf2::TransformException & ex) {
-  //       RCLCPP_INFO(get_logger(), "%s", ex.what());
-  //       return;
-  //     }
-  //   }
-  //   tf_broadcaster_->sendTransform(t);
-  // }
+        map_frame_published = true;
+      } catch (const tf2::TransformException & ex) {
+        RCLCPP_INFO(get_logger(), "%s", ex.what());
+        return;
+      }
+    }
+    tf_broadcaster_->sendTransform(t);
+  }
 
   void on_path_timer()
   {

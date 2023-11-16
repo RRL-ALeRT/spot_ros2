@@ -27,6 +27,34 @@ def generate_launch_description():
     )
     spot_plus.add_action(child_launch)
 
+    pcl_combined = launch_ros.actions.Node(
+                        package='spot_driver_plus',
+                        executable='get_pcl.py',
+                        output='screen',
+                    )
+    #spot_plus.add_action(pcl_combined)
+
+    battery_screen = launch_ros.actions.Node(
+                        package='spot_driver_plus',
+                        executable='battery_screen',
+                        output='screen',
+                    )
+    spot_plus.add_action(battery_screen)
+
+    map_vision_node = launch_ros.actions.Node(
+        package='spot_driver_plus',
+        executable='map_vision',
+        output='screen',
+    )
+    spot_plus.add_action(map_vision_node)
+    #map_vision_tf2 = launch_ros.actions.Node(
+    #    package='tf2_ros',
+    #    executable='static_transform_publisher',
+    #    output='screen',
+    #    arguments=['0.0', '0.0', '0.0', '0.0', '0.0', '0.0', '1.0', 'map', 'vision'],
+    #)
+    #spot_plus.add_action(map_vision_tf2)
+
     back_image = ExecuteProcess(
                         cmd=['ros2', 'run', 'spot_cpp_ros2', 'get_image', 'back'],
                         output='screen'

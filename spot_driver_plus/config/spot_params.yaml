@@ -21,4 +21,4 @@
     publish_depth_registered: False
     preferred_odom_frame: "vision"
     cmd_duration: 0.4
-    async_tasks_rate: 30
+    async_tasks_rate: 40
