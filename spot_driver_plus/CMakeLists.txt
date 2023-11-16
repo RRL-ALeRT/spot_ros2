@@ -66,10 +66,13 @@ install(DIRECTORY config
 set(PYTHON_NODES
   get_pcl.py
   gen3_servo_controller.py
+  estop_wrt_map.py
+  stand_in_front_of_estops.py
 )
 install(DIRECTORY python/${PROJECT_NAME}
   DESTINATION lib
 )
+
 foreach(PY_FILE ${PYTHON_NODES})
   execute_process(COMMAND chmod +x ${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/${PY_FILE})
 endforeach()
