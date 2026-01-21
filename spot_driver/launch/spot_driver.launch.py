@@ -237,6 +237,10 @@ def launch_setup(context: LaunchContext, ld: LaunchDescription) -> None:
         output="screen",
         parameters=[params],
         namespace=spot_name,
+        remappings=[
+        ("/robot_description", "/spot_robot_description"),
+    ],
+        
     )
     ld.add_action(robot_state_publisher)
 

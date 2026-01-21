@@ -48,6 +48,7 @@ from geometry_msgs.msg import (
     PoseStamped,
     TransformStamped,
     Twist,
+    TwistStamped,
     TwistWithCovarianceStamped,
     Vector3Stamped,
 )
@@ -1454,6 +1455,11 @@ class SpotROS(Node):
                         request.velocity_limit.linear.x,
                         request.velocity_limit.linear.y,
                         request.velocity_limit.angular.z,
+                    ).to_proto(),
+                    min_vel=math_helpers.SE2Velocity(
+                        - request.velocity_limit.linear.x,
+                        - request.velocity_limit.linear.y,
+                        - request.velocity_limit.angular.z,
                     ).to_proto()
                 )
             )
@@ -1973,7 +1979,7 @@ class SpotROS(Node):
             while rclpy.ok() and not self.spot_wrapper.at_goal and goal_handle.is_active:
                 feedback = Trajectory.Feedback()
                 if self.spot_wrapper.near_goal:
-                    if self.spot_wrapper._last_trajectory_command_precise:
+                    if self.spot_wrapper.last_trajectory_command_precise:
                         feedback.feedback = "Near goal, performing final adjustments"
                     else:
                         feedback.feedback = "Near goal"

@@ -17,7 +17,10 @@ using SpotImageType = spot_ros2::SpotImageType;
  * @details This makes it easier to compose collections of robot cameras, since some robots do not have a hand camera.
  */
 static const std::array<SpotCamera, 5> kAllSpotBodyCameras = {
-    SpotCamera::BACK, SpotCamera::FRONTLEFT, SpotCamera::FRONTRIGHT, SpotCamera::LEFT, SpotCamera::RIGHT,
+    SpotCamera::BACK,
+    //  SpotCamera::FRONTLEFT,
+    //   SpotCamera::FRONTRIGHT,
+       SpotCamera::LEFT, SpotCamera::RIGHT,
 };
 
 /**
@@ -25,8 +28,8 @@ static const std::array<SpotCamera, 5> kAllSpotBodyCameras = {
  */
 static const std::unordered_map<spot_ros2::SpotCamera, bosdyn::client::BodyCamera> kSpotCameraToSdkBodyCamera{
     {SpotCamera::BACK, bosdyn::client::BodyCamera::BACK},
-    {SpotCamera::FRONTLEFT, bosdyn::client::BodyCamera::FRONTLEFT},
-    {SpotCamera::FRONTRIGHT, bosdyn::client::BodyCamera::FRONTRIGHT},
+    // {SpotCamera::FRONTLEFT, bosdyn::client::BodyCamera::FRONTLEFT},
+    // {SpotCamera::FRONTRIGHT, bosdyn::client::BodyCamera::FRONTRIGHT},
     {SpotCamera::LEFT, bosdyn::client::BodyCamera::LEFT},
     {SpotCamera::RIGHT, bosdyn::client::BodyCamera::RIGHT},
 };
@@ -35,8 +38,12 @@ static const std::unordered_map<spot_ros2::SpotCamera, bosdyn::client::BodyCamer
  * @brief Map from each SpotCamera value to the corresponding string used when composing the ROS camera topic names.
  */
 static const std::unordered_map<spot_ros2::SpotCamera, std::string> kSpotCameraToRosString{
-    {SpotCamera::BACK, "back"}, {SpotCamera::FRONTLEFT, "frontleft"}, {SpotCamera::FRONTRIGHT, "frontright"},
-    {SpotCamera::HAND, "hand"}, {SpotCamera::LEFT, "left"},           {SpotCamera::RIGHT, "right"},
+    {SpotCamera::BACK, "back"}, 
+    // {SpotCamera::FRONTLEFT, "frontleft"}, 
+    // {SpotCamera::FRONTRIGHT, "frontright"},
+    {SpotCamera::HAND, "hand"}, 
+    {SpotCamera::LEFT, "left"},           
+    {SpotCamera::RIGHT, "right"},
 };
 
 /**
